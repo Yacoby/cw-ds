@@ -1,0 +1,15 @@
+begin process p1
+ send p2 m1
+ begin mutex
+ print abc
+ print def
+ end mutex
+end process
+
+begin process p2
+ print x1
+ recv p1 m1
+ print x2
+ send p1 m2
+ print x3
+end process p2
