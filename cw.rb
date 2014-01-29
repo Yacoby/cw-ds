@@ -28,6 +28,8 @@ class DsProcess
       while true
         if work = @msg_queue.shift || work = @cmd_queue.shift
           work.call
+        else
+          sleep(0.01)
         end
       end
     end
@@ -77,6 +79,7 @@ class DsProcess
   end
 
   def call_enter_mutex
+    raise "Attemtped to enter a mutex when already in a mutex" unless !@mutex_owned
     @mutex_wanted = true
     @@procs.each do |k,v|
       v.msg_req_mutex(@pid, @time) unless v == self
@@ -106,6 +109,7 @@ class DsProcess
       true
     else
       while !@msg_queue.empty? || !@cmd_queue.empty?
+        sleep(0.1)
       end
       false
     end
@@ -163,6 +167,5 @@ File.open("input") do |file|
   end
 
   while !current_processes.all? { |p| p.await_done }
-    current_processes.map { |p| p.await_done }
   end
 end
