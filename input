@@ -1,8 +1,8 @@
 begin process p1
  send p2 m1
  begin mutex
- print abc
- print def
+  print abc
+  print def
  end mutex
 end process
 
