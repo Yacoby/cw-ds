@@ -1,12 +1,3 @@
-require 'thread'
-require 'ostruct'
-
-$puts_mutex = Mutex.new
-
-def puts(o)
-  $puts_mutex.synchronize { super(o) }
-end
-
 class DsProcess
   @@msg = Hash.new { |h,k| h[k] = {} }
   @@procs = {}
@@ -23,19 +14,40 @@ class DsProcess
 
     @cmd_queue = []
     @msg_queue = []
+  end
 
-    @t = Thread.new do
-      while true
-        if work = @msg_queue.shift || work = @cmd_queue.shift
-          work.call
-        else
-          sleep(0.01)
-        end
-      end
+  def self.processes
+    @@procs.values
+  end
+
+  def exc_next_command
+    if work = @msg_queue.shift || work = @cmd_queue.shift
+      work.call
+    else
+      false
+    end
+  end
+
+  def has_tasks?
+    ![@msg_queue, @cmd_queue].all?(&:empty?)
+  end
+
+  def method_missing(method, *args, &block)
+    case method
+    when /msg_(?<method_suffix>.*)/
+      @msg_queue << lambda { send("call_#{$~[:method_suffix]}", *args) }
+      false
+    when /cmd_(?<method_suffix>.*)/
+      @cmd_queue << lambda { send("call_#{$~[:method_suffix]}", *args) }
+      false
+    else
+      super(method, *args, &block)
     end
   end
 
   def call_recv(pid, msg)
+    @time += 1
+
     send_rec_key = msg_key(pid, @pid)
     if @@msg[send_rec_key][msg] == nil
       msg_recv(pid, msg)
@@ -56,7 +68,6 @@ class DsProcess
     puts "sent #{@pid} #{msg} #{pid} #{@time}"
   end
 
-
   def call_req_mutex(req_pid, req_time)
     if !@mutex_owned && (!@mutex_wanted || @time > req_time)
       @@procs[req_pid].msg_req_mutex_response(@pid)
@@ -70,6 +81,7 @@ class DsProcess
   end
 
   def call_mutex_wait
+    raise 'Waiting when in an owned mutex' unless !@mutex_owned
     if (@@procs.keys - @mutex_accepts).length == 1
       @mutex_owned = true
       @mutex_accepts = []
@@ -79,7 +91,7 @@ class DsProcess
   end
 
   def call_enter_mutex
-    raise "Attemtped to enter a mutex when already in a mutex" unless !@mutex_owned
+    raise 'Attemtped to enter a mutex when already in a mutex' unless !@mutex_owned
     @mutex_wanted = true
     @@procs.each do |k,v|
       v.msg_req_mutex(@pid, @time) unless v == self
@@ -88,7 +100,7 @@ class DsProcess
   end
 
   def call_exit_mutex
-    raise "Called exit mutex without having a mutex" unless @mutex_owned
+    raise 'Called exit mutex without having a mutex' unless @mutex_owned
 
     @mutex_owned = false
     @mutex_wanted = false
@@ -98,74 +110,52 @@ class DsProcess
   end
 
   def call_print(msg)
-    raise "Called print without having mutex" unless @mutex_owned
+    raise 'Called print without having mutex' unless @mutex_owned
 
     @time += 1
     puts "printed #{@pid} #{msg} #{@time}"
   end
 
-  def await_done
-    if @msg_queue.empty? && @cmd_queue.empty?
-      true
-    else
-      while !@msg_queue.empty? || !@cmd_queue.empty?
-        sleep(0.1)
-      end
-      false
-    end
-  end
-
-  def method_missing(m, *args, &block)
-    if m.to_s.start_with? 'msg_'
-      m_suffix = m[/msg_(.*)/, 1]
-      @msg_queue << lambda { self.send("call_#{m_suffix}", *args) }
-    elsif m.to_s.start_with? 'cmd'
-      m_suffix = m[/cmd_(.*)/, 1]
-      @cmd_queue << lambda { self.send("call_#{m_suffix}", *args) }
-    else
-      super(m, *args, &block)
-    end
-  end
-
   private
 
   def msg_key(from_pid, to_pid)
-    OpenStruct.new(:frm => from_pid, :to => to_pid)
+    [from_pid, to_pid]
   end
 
 end
 
 File.open("input") do |file|
-  current_processes = []
   current_process = nil
   in_mutex = false
 
   file.each do |line|
-    line = line.strip
-    if line != ''
-      if proc_id = /begin process (.*)/.match(line)
-        current_process = DsProcess.new(proc_id[1])
-        current_processes << current_process
-      elsif /begin mutex/.match(line)
-        in_mutex = true
+    case line.strip
+    when ''
+    when /begin process (?<pid>.*)/
+      current_process = DsProcess.new($~[:pid])
+    when /^end process/
+    when /^begin mutex/
+      current_process.cmd_enter_mutex
+      in_mutex = true
+    when /^end mutex/
+      in_mutex = false
+      current_process.cmd_exit_mutex
+    else
+      proc_name, *args = line.split
+      if proc_name == 'print' && !in_mutex
         current_process.cmd_enter_mutex
-      elsif /end mutex/.match(line)
-        in_mutex = false
+        current_process.send("cmd_#{proc_name}", *args)
         current_process.cmd_exit_mutex
-      elsif /end process/.match(line)
       else
-        proc_name, *args = line.split(' ')
-        if proc_name == 'print' && !in_mutex
-          current_process.cmd_enter_mutex
-          current_process.send("cmd_#{proc_name}", *args)
-          current_process.cmd_exit_mutex
-        else
-          current_process.send("cmd_#{proc_name}", *args)
-        end
+        current_process.send("cmd_#{proc_name}", *args)
       end
     end
   end
 
-  while !current_processes.all? { |p| p.await_done }
+  while DsProcess.processes.all?(&:has_tasks?)
+    DsProcess.processes.each do |p|
+      loop { break unless p.exc_next_command }
+    end
   end
+
 end
