@@ -134,7 +134,7 @@ class DsProcess
 
 end
 
-if ARGV.length
+if ARGV.length > 0
   input_file = ARGV[0]
 else
   input_file = "input"
