@@ -5,6 +5,7 @@ class DsProcess
   def initialize(pid)
     @mutex_owned = false
     @mutex_wanted = false
+    @mutex_req_time = 0
     @mutex_accepts = []
     @mutex_deffer = []
 
@@ -49,15 +50,15 @@ class DsProcess
     end
   end
 
-  def call_recv(from_pid, msg)
+  def call_recv(from_pid, msg_id)
     send_rec_key = msg_key(from_pid, @pid)
-    if @@msg[send_rec_key][msg] == nil
-      msg_recv(from_pid, msg)
+    if @@msg[send_rec_key][msg_id] == nil
+      msg_recv(from_pid, msg_id)
     else
-      other_time = @@msg[send_rec_key].delete(msg)
+      other_time = @@msg[send_rec_key].delete(msg_id)
       @time = [@time, other_time].max + 1
 
-      puts "received #{@pid} #{msg} #{from_pid} #{@time}"
+      puts "received #{@pid} #{msg_id} #{from_pid} #{@time}"
     end
   end
 
@@ -71,17 +72,17 @@ class DsProcess
   end
 
   def call_req_mutex(req_pid, req_time)
-    if !@mutex_owned && (!@mutex_wanted || @time > req_time)
-      @@procs[req_pid].msg_req_mutex_response(@pid)
+    @time = [req_time, @time].max + 1
+    if !@mutex_owned && (!@mutex_wanted || @mutex_req_time > req_time)
+      @@procs[req_pid].msg_req_mutex_response(@pid, @time)
     else
       @mutex_deffer << req_pid
     end
-    @time = [req_time, @time].max + 1 # is this in the right place?
   end
 
-  def call_req_mutex_response(respone_pid)
+  def call_req_mutex_response(respone_pid, response_time)
     raise 'Accepting our request' if respone_pid == @pid
-    #does this need a timestamp?
+    @time = [response_time, @time].max + 1
     @mutex_accepts << respone_pid
   end
 
@@ -99,6 +100,7 @@ class DsProcess
   def call_enter_mutex
     raise 'Attemtped to enter a mutex when already in a mutex' unless !@mutex_owned
     @mutex_wanted = true
+    @mutex_req_time = @time
     @@procs.each do |k,v|
       v.msg_req_mutex(@pid, @time) unless v == self
     end
@@ -111,7 +113,9 @@ class DsProcess
     @mutex_owned = false
     @mutex_wanted = false
 
-    @mutex_deffer.each { |def_pid| @@procs[def_pid].msg_req_mutex_response(@pid) }
+    @mutex_deffer.each do
+      |def_pid| @@procs[def_pid].msg_req_mutex_response(@pid, @time)
+    end
     @mutex_deffer = []
   end
 
