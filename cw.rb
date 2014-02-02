@@ -168,6 +168,8 @@ File.open(input_file) do |file|
     end
   end
 
+  #While at one point this was evaluated using threads this turned out to be quite
+  #slow due to the GIL. This is faster as its scheduling is relatively good
   while DsProcess.processes.any?(&:has_tasks?)
     DsProcess.processes.each do |p|
       loop { break unless p.exc_next_command }
@@ -175,3 +177,35 @@ File.open(input_file) do |file|
   end
 
 end
+
+
+__END__
+
+THEROY QUESTIONS
+
+
+Q1
+
+
+Q2
+
+Q3
+
+Each leaf sends its (p.f, p.f, 1) to its parent
+
+On recipt of all data (sum_i, max_i, count_i) from its n children each node p sends
+(p.f + SUM(sum_1, sum_2, ... sum_n), MAX(p.f, max_1, max_2, ... max_n), 1 + SUM(count_1, count_2, ... count_n))
+
+
+The root node will then hold all the data
+It then preforms the following operation on its tuple to product a new tuple
+(avg, max) = (sum/count, max)
+
+Which is the needed result.
+
+The message length is fixed, so the cost of sending a message is fixed.
+In the worst case, the minimum spanning tree represents a single line of processors.
+In this case O(n) messages need to be sent taking O(n) time as the cost to send a message is fixed.
+
+Q4
+The diameter of the network is defined by the longest shourtest path
