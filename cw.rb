@@ -45,27 +45,25 @@ class DsProcess
     end
   end
 
-  def call_recv(pid, msg)
-    @time += 1
-
-    send_rec_key = msg_key(pid, @pid)
+  def call_recv(from_pid, msg)
+    send_rec_key = msg_key(from_pid, @pid)
     if @@msg[send_rec_key][msg] == nil
-      msg_recv(pid, msg)
+      msg_recv(from_pid, msg)
     else
       other_time = @@msg[send_rec_key].delete(msg)
-      @time = [@time, other_time].max
+      @time = [@time, other_time].max + 1
 
-      puts "received #{@pid} #{msg} #{pid} #{@time}"
+      puts "received #{@pid} #{msg} #{from_pid} #{@time}"
     end
   end
 
-  def call_send(pid, msg)
+  def call_send(to_pid, msg)
     @time += 1
 
-    send_rec_key = msg_key(@pid, pid)
+    send_rec_key = msg_key(@pid, to_pid)
     @@msg[send_rec_key][msg] = @time
 
-    puts "sent #{@pid} #{msg} #{pid} #{@time}"
+    puts "sent #{@pid} #{msg} #{to_pid} #{@time}"
   end
 
   def call_req_mutex(req_pid, req_time)
@@ -124,7 +122,13 @@ class DsProcess
 
 end
 
-File.open("input") do |file|
+if ARGV.length
+  input_file = ARGV[0]
+else
+  input_file = "input"
+end
+
+File.open(input_file) do |file|
   current_process = nil
   in_mutex = false
 
@@ -152,7 +156,7 @@ File.open("input") do |file|
     end
   end
 
-  while DsProcess.processes.all?(&:has_tasks?)
+  while DsProcess.processes.any?(&:has_tasks?)
     DsProcess.processes.each do |p|
       loop { break unless p.exc_next_command }
     end
