@@ -32,6 +32,10 @@ class DsProcess
     ![@msg_queue, @cmd_queue].all?(&:empty?)
   end
 
+  def mutex_owned?
+    @mutex_owned
+  end
+
   def method_missing(method, *args, &block)
     case method
     when /msg_(?<method_suffix>.*)/
@@ -72,15 +76,19 @@ class DsProcess
     else
       @mutex_deffer << req_pid
     end
+    @time = [req_time, @time].max + 1 # is this in the right place?
   end
 
   def call_req_mutex_response(respone_pid)
+    raise 'Accepting our request' if respone_pid == @pid
+    #does this need a timestamp?
     @mutex_accepts << respone_pid
   end
 
   def call_mutex_wait
     raise 'Waiting when in an owned mutex' unless !@mutex_owned
     if (@@procs.keys - @mutex_accepts).length == 1
+      raise 'Attemtped to enter a mutex when another process is in a mutex' unless @@procs.values.none?(&:mutex_owned?)
       @mutex_owned = true
       @mutex_accepts = []
     else
@@ -103,7 +111,7 @@ class DsProcess
     @mutex_owned = false
     @mutex_wanted = false
 
-    @mutex_deffer.each { |pid| @@procs[pid].msg_req_mutex_response(@pid) }
+    @mutex_deffer.each { |def_pid| @@procs[def_pid].msg_req_mutex_response(@pid) }
     @mutex_deffer = []
   end
 
