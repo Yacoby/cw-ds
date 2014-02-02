@@ -188,24 +188,29 @@ Q1
 
 
 Q2
+To avoid starvation an alogirthm needs to be fair (i.e. requests for a lock are honored in the order that they are made). This prevents starvation. A system that is libable to have starvation is one that always grants the request of the most recent request.
 
 Q3
 
 Each leaf sends its (p.f, p.f, 1) to its parent
 
-On recipt of all data (sum_i, max_i, count_i) from its n children each node p sends
+On recipt of all data (sum_i, max_i, count_i) from its ith of n children each node p sends the following data to its parents unless it is the root node in which case it does nothing
 (p.f + SUM(sum_1, sum_2, ... sum_n), MAX(p.f, max_1, max_2, ... max_n), 1 + SUM(count_1, count_2, ... count_n))
 
-
-The root node will then hold all the data
-It then preforms the following operation on its tuple to product a new tuple
+The root node will then hold (sum, max, count)
+It then preforms the following operation on its tuple to product a new tuple 
 (avg, max) = (sum/count, max)
-
-Which is the needed result.
+This new tuple now contains the needed result.
 
 The message length is fixed, so the cost of sending a message is fixed.
 In the worst case, the minimum spanning tree represents a single line of processors.
 In this case O(n) messages need to be sent taking O(n) time as the cost to send a message is fixed.
 
 Q4
-The diameter of the network is defined by the longest shourtest path
+The diameter of the network is defined by the longest shourtest path. In the case
+the diameter of the weighted graph this is:
+d -> h -> l -> m
+
+If each edge had a weight of 1 then the following paths of cost 5 would realise this:
+"e", "a", "c", "g", "l", "m"
+"e", "a", "c", "f", "i", "k"
