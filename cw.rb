@@ -39,11 +39,11 @@ class DsProcess
 
   def method_missing(method, *args, &block)
     case method
-    when /msg_(?<method_suffix>.*)/
-      @msg_queue << lambda { send("call_#{$~[:method_suffix]}", *args) }
+    when /msg_(.*)/
+      @msg_queue << lambda { send("call_#{$~[1]}", *args) }
       false
-    when /cmd_(?<method_suffix>.*)/
-      @cmd_queue << lambda { send("call_#{$~[:method_suffix]}", *args) }
+    when /cmd_(.*)/
+      @cmd_queue << lambda { send("call_#{$~[1]}", *args) }
       false
     else
       super(method, *args, &block)
@@ -147,8 +147,8 @@ File.open(input_file) do |file|
   file.each do |line|
     case line.strip
     when ''
-    when /begin process (?<pid>.*)/
-      current_process = DsProcess.new($~[:pid])
+    when /begin process (.*)/
+      current_process = DsProcess.new($~[1])
     when /^end process/
     when /^begin mutex/
       current_process.cmd_enter_mutex
@@ -178,20 +178,16 @@ File.open(input_file) do |file|
 
 end
 
-
 __END__
 
 THEROY QUESTIONS
 
-
 Q1
-
 
 Q2
 To avoid starvation an alogirthm needs to be fair (i.e. requests for a lock are honored in the order that they are made). This prevents starvation. A system that is libable to have starvation is one that always grants the request of the most recent request.
 
 Q3
-
 Each leaf sends its (p.f, p.f, 1) to its parent
 
 On recipt of all data (sum_i, max_i, count_i) from its ith of n children each node p sends the following data to its parents unless it is the root node in which case it does nothing
