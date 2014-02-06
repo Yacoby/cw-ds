@@ -38,11 +38,11 @@ class DsProcess
   end
 
   def method_missing(method, *args, &block)
-    case method
-    when /msg_(.*)/
+    case method.to_s
+    when /^msg_(.*)/
       @msg_queue << lambda { send("call_#{$1}", *args) }
       false
-    when /cmd_(.*)/
+    when /^cmd_(.*)/
       @cmd_queue << lambda { send("call_#{$1}", *args) }
       false
     else
@@ -149,11 +149,11 @@ File.open(input_file) do |file|
     when ''
     when /begin process (.*)/
       current_process = DsProcess.new($1)
-    when /^end process/
-    when /^begin mutex/
+    when /end process/
+    when /begin mutex/
       current_process.cmd_enter_mutex
       in_mutex = true
-    when /^end mutex/
+    when /end mutex/
       in_mutex = false
       current_process.cmd_exit_mutex
     else
