@@ -40,10 +40,10 @@ class DsProcess
   def method_missing(method, *args, &block)
     case method
     when /msg_(.*)/
-      @msg_queue << lambda { send("call_#{$~[1]}", *args) }
+      @msg_queue << lambda { send("call_#{$1}", *args) }
       false
     when /cmd_(.*)/
-      @cmd_queue << lambda { send("call_#{$~[1]}", *args) }
+      @cmd_queue << lambda { send("call_#{$1}", *args) }
       false
     else
       super(method, *args, &block)
@@ -148,7 +148,7 @@ File.open(input_file) do |file|
     case line.strip
     when ''
     when /begin process (.*)/
-      current_process = DsProcess.new($~[1])
+      current_process = DsProcess.new($1)
     when /^end process/
     when /^begin mutex/
       current_process.cmd_enter_mutex
