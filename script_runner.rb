@@ -1,5 +1,14 @@
 #!/usr/bin/env ruby
 
+
+# This class uses two queues of work that should be done. One for 
+# external commands such as "send pid msg". The other is for high priority
+# internal communication such as sending mutex requests or implementing wait loops
+#
+# The commands that the scrip uses are implemented in this class by method names
+# prefixed with "call_"
+#
+# Debug checks have been left in
 class DsProcess
   @@msg = Hash.new { |h,k| h[k] = {} }
   @@procs = {}
@@ -41,10 +50,10 @@ class DsProcess
 
   def method_missing(method, *args, &block)
     case method.to_s
-    when /^msg_(.*)/
+    when /^queue_msg_(.*)/
       @msg_queue << lambda { send("call_#{$1}", *args) }
       false
-    when /^cmd_(.*)/
+    when /^queue_cmd_(.*)/
       @cmd_queue << lambda { send("call_#{$1}", *args) }
       false
     else
@@ -52,10 +61,12 @@ class DsProcess
     end
   end
 
+  private
+
   def call_recv(from_pid, msg_id)
     send_rec_key = msg_key(from_pid, @pid)
     if @@msg[send_rec_key][msg_id] == nil
-      msg_recv(from_pid, msg_id)
+      queue_msg_recv(from_pid, msg_id)
     else
       other_time = @@msg[send_rec_key].delete(msg_id)
       @time = [@time, other_time].max + 1
@@ -73,40 +84,48 @@ class DsProcess
     puts "sent #{@pid} #{msg} #{to_pid} #{@time}"
   end
 
+  # This isn't part of the script language but is used internally when
+  # needing to enter a mutex. This is called from the process requesting access
+  # to a mutex
   def call_req_mutex(req_pid, req_time)
     @time = [req_time, @time].max + 1
     if !@mutex_owned && (!@mutex_wanted || @mutex_req_time > req_time)
-      @@procs[req_pid].msg_req_mutex_response(@pid, @time)
+      @@procs[req_pid].queue_msg_req_mutex_response(@pid, @time)
     else
       @mutex_deffer << req_pid
     end
   end
 
+  # This also isn't part of the script language but represents a response from another
+  # process indicating the acceptance of a mutex request
   def call_req_mutex_response(respone_pid, response_time)
-    raise 'Accepting our request' if respone_pid == @pid
+    raise 'Accepting our own request. No need to do this' if respone_pid == @pid
     @time = [response_time, @time].max + 1
     @mutex_accepts << respone_pid
   end
 
+  # Used when waiting for a mutex, this either waits adds itself to the message queue
+  # which has a benefit over a while loop in that it allows responding to mutex requests
+  # while waiting
   def call_mutex_wait
     raise 'Waiting when in an owned mutex' unless !@mutex_owned
     if (@@procs.keys - @mutex_accepts).length == 1
-      raise 'Attemtped to enter a mutex when another process is in a mutex' unless @@procs.values.none?(&:mutex_owned?)
+      raise 'Attempted to enter a mutex when another process is in a mutex' unless @@procs.values.none?(&:mutex_owned?)
       @mutex_owned = true
       @mutex_accepts = []
     else
-      msg_mutex_wait
+      queue_msg_mutex_wait
     end
   end
 
   def call_enter_mutex
-    raise 'Attemtped to enter a mutex when already in a mutex' unless !@mutex_owned
+    raise 'Attempted to enter a mutex when already in a mutex' unless !@mutex_owned
     @mutex_wanted = true
     @mutex_req_time = @time
     @@procs.each do |k,v|
-      v.msg_req_mutex(@pid, @time) unless v == self
+      v.queue_msg_req_mutex(@pid, @time) unless v == self
     end
-    msg_mutex_wait
+    queue_msg_mutex_wait
   end
 
   def call_exit_mutex
@@ -116,7 +135,7 @@ class DsProcess
     @mutex_wanted = false
 
     @mutex_deffer.each do
-      |def_pid| @@procs[def_pid].msg_req_mutex_response(@pid, @time)
+      |def_pid| @@procs[def_pid].queue_msg_req_mutex_response(@pid, @time)
     end
     @mutex_deffer = []
   end
@@ -128,16 +147,13 @@ class DsProcess
     puts "printed #{@pid} #{msg} #{@time}"
   end
 
-  private
-
   def msg_key(from_pid, to_pid)
     [from_pid, to_pid]
   end
 
 end
 
-filename = ARGV.pop
-raise "Need to specify a file to process" unless filename
+raise "Need to specify a file to process" unless (filename = ARGV.pop)
 
 File.open(filename) do |file|
   current_process = nil
@@ -150,19 +166,19 @@ File.open(filename) do |file|
       current_process = DsProcess.new($1)
     when /end process/
     when /begin mutex/
-      current_process.cmd_enter_mutex
+      current_process.queue_cmd_enter_mutex
       in_mutex = true
     when /end mutex/
       in_mutex = false
-      current_process.cmd_exit_mutex
+      current_process.queue_cmd_exit_mutex
     else
       proc_name, *args = line.split
       if proc_name == 'print' && !in_mutex
-        current_process.cmd_enter_mutex
-        current_process.send("cmd_#{proc_name}", *args)
-        current_process.cmd_exit_mutex
+        current_process.queue_cmd_enter_mutex
+        current_process.send("queue_cmd_#{proc_name}", *args)
+        current_process.queue_cmd_exit_mutex
       else
-        current_process.send("cmd_#{proc_name}", *args)
+        current_process.send("queue_cmd_#{proc_name}", *args)
       end
     end
   end
@@ -170,9 +186,7 @@ File.open(filename) do |file|
   #While at one point this was evaluated using threads this turned out to be quite
   #slow due to the GIL. This is faster as its scheduling is relatively good
   while DsProcess.processes.any?(&:has_tasks?)
-    DsProcess.processes.each do |p|
-      loop { break unless p.exc_next_command }
-    end
+    DsProcess.processes.each { |p| loop { break unless p.exc_next_command } }
   end
 
 end
