@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 class DsProcess
   @@msg = Hash.new { |h,k| h[k] = {} }
   @@procs = {}
@@ -134,13 +136,10 @@ class DsProcess
 
 end
 
-if ARGV.length > 0
-  input_file = ARGV[0]
-else
-  input_file = "input"
-end
+filename = ARGV.pop
+raise "Need to specify a file to process" unless filename
 
-File.open(input_file) do |file|
+File.open(filename) do |file|
   current_process = nil
   in_mutex = false
 
