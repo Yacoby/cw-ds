@@ -131,8 +131,7 @@ class DsProcess
 
     @mutex_owned = @mutex_wanted = false
 
-    @mutex_deffer.map { |pid| @@procs[pid] }
-                 .each { |p| p.queue_msg_req_mutex_response(@pid, @time) }
+    @mutex_deffer.map { |pid| @@procs[pid] }.each { |p| p.queue_msg_req_mutex_response(@pid, @time) }
     @mutex_deffer = []
   end
 
@@ -171,7 +170,7 @@ File.open(filename) do |file|
       proc_name, *args = line.split
       should_add_mutex = proc_name == 'print' && !in_mutex
       current_process.queue_cmd_enter_mutex if should_add_mutex
-      current_process.public_send("queue_cmd_#{proc_name}", *args)
+      current_process.send("queue_cmd_#{proc_name}", *args)
       current_process.queue_cmd_exit_mutex if should_add_mutex
     end
   end
