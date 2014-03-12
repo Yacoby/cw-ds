@@ -35,17 +35,22 @@ $$
 $$
 
 For the node $r$ on receipt of data from all its $n$ children, $r$ does the same calculation as above:
-$$(r.f + \sum_{i=0}^n  sum_i, \text{MAX}(r.f, max_1, max_2, ... max_n), 1 + \sum_i^n count_i)$$
+$$
+(r.f + \sum_{i=0}^n  sum_i, \text{MAX}(r.f, max_1, max_2, ... max_n), 1 + \sum_i^n count_i)
+$$
 
 So it then holds hold $(\text{sum}, \text{max}, \text{count})$.  It then preforms the following operation on its tuple to product a new tuple 
 $$\text{result} = (\text{avg}, \text{max}) = (\text{sum/count}, \text{max})$$
 
-This new tuple is the required result.
-
 The response message length is also fixed, so the cost of sending a message is fixed.
 Again in the worst case, the minimum spanning tree represents a list of processors so in this case $O(n)$ messages need to be sent sequentially taking $O(n)$ time.
 
-In total the time taken for this algorithm is $O(n) + O(n) = O(n)$
+This new tuple is the required result, although it needs to be propgated to all nodes. This can be done by $r$ sending the result tuple to all children, and then all reciving nodes sending the result to their children until. This will propgate the result through all nodes in $T$.
+
+Again for the same reasons as before this takes $O(n)$ time.
+
+
+In total the time taken for this algorithm is $O(n) + O(n) + O(n) = O(n)$
 
 \subsection*{Q4}
 The diameter of the network is defined by the longest shortest path. In the case
