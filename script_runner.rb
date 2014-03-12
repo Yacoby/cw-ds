@@ -84,12 +84,18 @@ class DsProcess
     puts "sent #{@pid} #{msg} #{to_pid} #{@time}"
   end
 
+  # This needs to support the edge case in lamport clocks that the two request times
+  # are the same. This tie break is fixed based on PID
+  def is_mutex_request_higher_priority(their_pid, their_req_time)
+    ( @mutex_req_time > their_req_time ) || ( @mutex_req_time == their_req_time && their_pid < @pid )
+  end
+
   # This isn't part of the script language but is used internally when
   # needing to enter a mutex. This is called from the process requesting access
   # to a mutex
   def call_req_mutex(req_pid, req_time)
     @time = [req_time, @time].max + 1
-    if !@mutex_owned && (!@mutex_wanted || @mutex_req_time > req_time)
+    if !@mutex_owned && (!@mutex_wanted || is_mutex_request_higher_priority(req_pid, req_time))
       @@procs[req_pid].queue_msg_req_mutex_response(@pid, @time)
     else
       @mutex_deffer << req_pid
