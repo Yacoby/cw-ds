@@ -17,6 +17,8 @@ I assume that the starting time $(0,0)$ is some point before either of the first
 \subsection*{Q2}
 To avoid starvation an algorithm needs to be fair (i.e. requests for a lock are honored in the order that they are made). This prevents starvation. A system that is liable to have starvation is one that always grants the request of the most recent request for a mutex over that of older requests.
 
+In a three process system where processes request and release the mutex in a loop, this mutex algorithm will lead to two of the processes being granted access to the critical section and the third becoming starved. This is because the third process will always have the oldest request for the critical section one of the other two processes will always have the more recent request.
+
 \subsection*{Q3}
 
 The response data is of fixed size and is represented using the following tuple
@@ -45,10 +47,9 @@ $$\text{result} = (\text{avg}, \text{max}) = (\text{sum/count}, \text{max})$$
 The response message length is also fixed, so the cost of sending a message is fixed.
 Again in the worst case, the minimum spanning tree represents a list of processors so in this case $O(n)$ messages need to be sent sequentially taking $O(n)$ time.
 
-This new tuple is the required result, although it needs to be propgated to all nodes. This can be done by $r$ sending the result tuple to all children, and then all reciving nodes sending the result to their children until. This will propgate the result through all nodes in $T$.
+This new tuple is the required result, although it needs to be propgated to all nodes. This can be done by $r$ sending the result tuple to all children, and then all reciving no leaf nodes sending the result to their children. This will propgate the result through all nodes in $T$.
 
 Again for the same reasons as before this takes $O(n)$ time.
-
 
 In total the time taken for this algorithm is $O(n) + O(n) + O(n) = O(n)$
 
